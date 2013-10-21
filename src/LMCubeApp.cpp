@@ -17,6 +17,7 @@ void LMCubeApp::setup()
   setWindowSize(_windowWidth, _windowHeight);
   setFrameRate(60);
   setFullScreen(true);
+  hideCursor();
 }
 
 void LMCubeApp::mouseDown( MouseEvent event )
@@ -38,7 +39,7 @@ void LMCubeApp::draw()
       Leap::Hand h = frame.hands()[0];
       if(h.fingers().count() > 1) // no fist
       {
-        const float rotation_factor = 0.05f;
+        const float rotation_factor = 0.025f;
         const float translation_factor = 0.025f;
         const float y_offset = 150.0f;
 
@@ -75,7 +76,7 @@ void LMCubeApp::draw()
         yaw   *= rotation_factor;
         roll  *= rotation_factor;
         
-        _rotation *= Quatf(pitch, yaw, -roll);
+        _rotation *= Quatf(-pitch, -yaw, -roll);
       }
     }
   }

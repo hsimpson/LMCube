@@ -1,4 +1,5 @@
 #include "LMCubeApp.h"
+#include <cmath>
 
 LMCubeApp::LMCubeApp()
   : _windowWidth(1024),
@@ -42,36 +43,48 @@ void LMCubeApp::draw()
         const float rotation_factor = 0.025f;
         const float translation_factor = 0.025f;
         const float y_offset = 150.0f;
+        const float rotation_threshold_radians = 10.0f * (float)(M_PI/180.0f);
+        const float translation_threshold_mm = 20.0f;
 
+        // Translation
         Leap::Vector palm_position = h.palmPosition();
 
         float x = palm_position.x;
         float y = palm_position.y;
         float z = palm_position.z;
-        /*/
+        /*
         console() << "x=" << x
                   << " y=" << y
                   << " z=" << z
                   << std::endl;
-        /**/
-
-        x *= translation_factor;
+        */
+        
+        // reduce y by fixed offset because we whant the y origin be above the controller :-)
         y -= y_offset;
+        
+        x = ((std::abs(x) - translation_threshold_mm) <= 0.0f) ? 0.0f : x;
+        y = ((std::abs(y) - translation_threshold_mm) <= 0.0f) ? 0.0f : y;
+        z = ((std::abs(z) - translation_threshold_mm) <= 0.0f) ? 0.0f : z;
+        
+        x *= translation_factor;
         y *= translation_factor;
         z *= translation_factor;
 
         _translation += Vec3f(x, -y, z);
 
-
+        // Rotation
         float pitch = h.direction().pitch();
         float yaw   = h.direction().yaw();
         float roll  = h.palmNormal().roll();
-        /*/
+        pitch = ((std::abs(pitch) - rotation_threshold_radians) <= 0.0f) ? 0.0f : pitch;
+        yaw =   ((std::abs(yaw)   - rotation_threshold_radians) <= 0.0f) ? 0.0f : yaw;
+        roll =  ((std::abs(roll)  - rotation_threshold_radians) <= 0.0f) ? 0.0f : roll;
+        /*
         console() << "pitch=" << pitch
                   << " yaw=" << yaw
                   << " roll=" << roll
                   << std::endl;
-        /**/
+        */
         pitch *= rotation_factor;
         yaw   *= rotation_factor;
         roll  *= rotation_factor;

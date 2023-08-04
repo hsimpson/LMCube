@@ -1,14 +1,8 @@
 #include "LeapController.h"
-#include <process.h>
+#include "spdlog/spdlog.h"
 
-LEAP_CONNECTION      LeapController::_connectionHandle = NULL;
-bool                 LeapController::_running          = false;
-bool                 LeapController::_connected        = false;
-HANDLE               LeapController::_pollingThread;
-CRITICAL_SECTION     LeapController::_dataLock;
-LEAP_TRACKING_EVENT* LeapController::_lastFrame = NULL;
+LeapController::LeapController() {}
 
-//LeapController::LeapController() {}
 LeapController::~LeapController() {
   closeLeapConnection();
   LeapDestroyConnection(_connectionHandle);
@@ -19,12 +13,12 @@ void LeapController::openLeapConnection() {
     return;
   }
 
-  if (LeapController::_connectionHandle || LeapCreateConnection(NULL, &_connectionHandle) == eLeapRS_Success) {
+  spdlog::debug("Creating LeapConnection...");
+  if (_connectionHandle || LeapCreateConnection(NULL, &_connectionHandle) == eLeapRS_Success) {
     eLeapRS result = LeapOpenConnection(_connectionHandle);
     if (result == eLeapRS_Success) {
-      _running = true;
-      InitializeCriticalSection(&_dataLock);
-      _pollingThread = (HANDLE)_beginthread(messageLoop, 0, NULL);
+      _running       = true;
+      _pollingThread = std::thread(&LeapController::messageLoop, this);
     }
   }
 }
@@ -35,28 +29,27 @@ void LeapController::closeLeapConnection() {
   }
   _running = false;
   LeapCloseConnection(_connectionHandle);
-  WaitForSingleObject(_pollingThread, INFINITE);
-  //CloseHandle(_pollingThread);
+  _pollingThread.join();
 }
 
 void LeapController::setFrame(const LEAP_TRACKING_EVENT* frame) {
-  EnterCriticalSection(&_dataLock);
+  _dataLock.lock();
   if (!_lastFrame) {
     _lastFrame = (LEAP_TRACKING_EVENT*)malloc(sizeof(*frame));
   }
   *_lastFrame = *frame;
-  LeaveCriticalSection(&_dataLock);
+  _dataLock.unlock();
 }
 
 LEAP_TRACKING_EVENT* LeapController::getFrame() {
   LEAP_TRACKING_EVENT* currentFrame;
-  EnterCriticalSection(&_dataLock);
+  _dataLock.lock();
   currentFrame = _lastFrame;
-  LeaveCriticalSection(&_dataLock);
+  _dataLock.unlock();
   return currentFrame;
 }
 
-void LeapController::messageLoop(void* unused) {
+void LeapController::messageLoop() {
   eLeapRS                 result;
   LEAP_CONNECTION_MESSAGE msg;
   while (_running) {
@@ -84,13 +77,16 @@ void LeapController::messageLoop(void* unused) {
 }
 
 void LeapController::handleConnectionEvent(const LEAP_CONNECTION_EVENT* connection_event) {
+  spdlog::debug("LeapController connection event");
   _connected = true;
 }
 
 void LeapController::handleConnectionLostEvent(const LEAP_CONNECTION_LOST_EVENT* connection_lost_event) {
+  spdlog::debug("LeapController connection lost event");
   _connected = false;
 }
 
 void LeapController::handleTrackingEvent(const LEAP_TRACKING_EVENT* tracking_event) {
-  setFrame(tracking_event);  //support polling tracking data from different thread
+  // spdlog::debug("LeapController tracking event");
+  setFrame(tracking_event);  // support polling tracking data from different thread
 }

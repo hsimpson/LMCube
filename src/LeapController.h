@@ -1,28 +1,29 @@
 #pragma once
-#include <Windows.h>
 #include "LeapC.h"
+#include <thread>
+#include <mutex>
 
 class LeapController {
  public:
-  //LeapController();
+  LeapController();
   virtual ~LeapController();
   void                 openLeapConnection();
   void                 closeLeapConnection();
-  bool                 isConnected() { return LeapController::_connected; }
+  bool                 isConnected() { return _connected; }
   LEAP_TRACKING_EVENT* getFrame();
 
  private:
-  static void messageLoop(void* unused);
-  static void handleConnectionEvent(const LEAP_CONNECTION_EVENT* connection_event);
-  static void handleConnectionLostEvent(const LEAP_CONNECTION_LOST_EVENT* connection_lost_event);
-  static void handleTrackingEvent(const LEAP_TRACKING_EVENT* tracking_event);
-  static void setFrame(const LEAP_TRACKING_EVENT* frame);
+  void messageLoop();
+  void handleConnectionEvent(const LEAP_CONNECTION_EVENT* connection_event);
+  void handleConnectionLostEvent(const LEAP_CONNECTION_LOST_EVENT* connection_lost_event);
+  void handleTrackingEvent(const LEAP_TRACKING_EVENT* tracking_event);
+  void setFrame(const LEAP_TRACKING_EVENT* frame);
 
  private:
-  static LEAP_CONNECTION      _connectionHandle;
-  static HANDLE               _pollingThread;
-  static CRITICAL_SECTION     _dataLock;
-  static bool                 _running;
-  static bool                 _connected;
-  static LEAP_TRACKING_EVENT* _lastFrame;
+  LEAP_CONNECTION      _connectionHandle;
+  std::thread          _pollingThread;
+  std::mutex           _dataLock;
+  bool                 _running   = false;
+  bool                 _connected = false;
+  LEAP_TRACKING_EVENT* _lastFrame = nullptr;
 };

@@ -1,6 +1,6 @@
 add_executable(LMCube
-    LMCubeApp.cpp
     LeapController.cpp
+    LMCubeApp.cpp
 )
 
 CPMAddPackage(

@@ -1,5 +1,4 @@
 #include "LeapController.h"
-#include "spdlog/spdlog.h"
 
 LeapController::LeapController() {}
 
@@ -13,14 +12,22 @@ void LeapController::openLeapConnection() {
     return;
   }
 
-  spdlog::debug("Creating LeapConnection...");
-  if (_connectionHandle || LeapCreateConnection(NULL, &_connectionHandle) == eLeapRS_Success) {
-    eLeapRS result = LeapOpenConnection(_connectionHandle);
-    if (result == eLeapRS_Success) {
-      _running       = true;
-      _pollingThread = std::thread(&LeapController::messageLoop, this);
-    }
+  if (!_connectionHandle) {
+    spdlog::debug("Creating LeapConnection...");
+    LEAP_CONNECTION_CONFIG config = {
+        sizeof(LEAP_CONNECTION_CONFIG),
+        eLeapConnectionConfig::eLeapConnectionConfig_MultiDeviceAware,
+        NULL,
+        eLeapTrackingOrigin::eLeapTrackingOrigin_DeviceCenter,
+    };
+    // when using the above config, then polling times out
+    // LEAPC_CHECK(LeapCreateConnection(&config, &_connectionHandle));
+    LEAPC_CHECK(LeapCreateConnection(NULL, &_connectionHandle));
   }
+
+  LEAPC_CHECK(LeapOpenConnection(_connectionHandle));
+  _running       = true;
+  _pollingThread = std::thread(&LeapController::messageLoop, this);
 }
 
 void LeapController::closeLeapConnection() {
@@ -53,12 +60,9 @@ void LeapController::messageLoop() {
   eLeapRS                 result;
   LEAP_CONNECTION_MESSAGE msg;
   while (_running) {
-    unsigned int timeout = 1000;
-    result               = LeapPollConnection(_connectionHandle, timeout, &msg);
-
-    if (result != eLeapRS_Success) {
-      continue;
-    }
+    unsigned int timeout = 10000;
+    spdlog::trace("LeapController polling connection...");
+    LEAPC_CHECK(LeapPollConnection(_connectionHandle, timeout, &msg));
 
     switch (msg.type) {
       case eLeapEventType_Connection:
@@ -69,6 +73,9 @@ void LeapController::messageLoop() {
         break;
       case eLeapEventType_Tracking:
         handleTrackingEvent(msg.tracking_event);
+        break;
+      case eLeapEventType_Device:
+        handleDeviceEvent(msg.device_event);
         break;
       default:
         break;
@@ -87,6 +94,25 @@ void LeapController::handleConnectionLostEvent(const LEAP_CONNECTION_LOST_EVENT*
 }
 
 void LeapController::handleTrackingEvent(const LEAP_TRACKING_EVENT* tracking_event) {
-  // spdlog::debug("LeapController tracking event");
+  spdlog::trace("LeapController tracking event");
   setFrame(tracking_event);  // support polling tracking data from different thread
+}
+
+void LeapController::handleDeviceEvent(const LEAP_DEVICE_EVENT* device_event) {
+  spdlog::debug("LeapController device event");
+  LEAP_DEVICE leap_device;
+  LEAPC_CHECK(LeapOpenDevice(device_event->device, &leap_device));
+
+  LEAP_DEVICE_INFO device_info;
+  memset(&device_info, 0, sizeof(device_info));
+
+  char serial[1000];
+  memset(serial, 0, sizeof(serial));
+  device_info.serial_length = sizeof(serial) - 1;
+  device_info.serial        = serial;
+  device_info.size          = sizeof(device_info);
+
+  LEAPC_CHECK(LeapGetDeviceInfo(leap_device, &device_info));
+
+  spdlog::debug("LeapController device info serial: {}, h_fov: {}, v_fov {}", device_info.serial, device_info.h_fov, device_info.v_fov);
 }

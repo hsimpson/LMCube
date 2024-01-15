@@ -12,7 +12,8 @@ LMCubeApp::~LMCubeApp() {
 }
 
 void LMCubeApp::setup() {
-  spdlog::set_level(spdlog::level::debug);  // Set global log level to debug
+  // spdlog::set_level(spdlog::level::debug);  // Set global log level to debug
+  spdlog::set_level(spdlog::level::trace);  // Set global log level to trace
   _camera.lookAt(cinder::vec3(0, 0, 5), cinder::vec3(0));
   _camera.setFov(60);
   _camera.setNearClip(0.1f);
